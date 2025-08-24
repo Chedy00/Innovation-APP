@@ -49,7 +49,12 @@ $router->post("/admin/users/delete/{id}", "AdminController@deleteUser");
 $router->get("/admin/thematiques", "AdminController@manageThematiques");
 $router->get("/admin/thematiques/create", "AdminController@createThematique");
 
-
+// New route for updating idea status
+$router->post("/admin/updateIdeaStatus/{id}", "AdminController@updateIdeaStatus");
+$router->post("/admin/thematiques/store", "AdminController@storeThematique");
+$router->get("/admin/thematiques/edit/{id}", "AdminController@editThematique");
+$router->post("/admin/thematiques/update/{id}", "AdminController@updateThematique");
+$router->post("/admin/thematiques/delete/{id}", "AdminController@deleteThematique");
 
 $router->get("/admin/ideas", "AdminController@manageIdeas");
 $router->get("/admin/viewIdea/{id}", "AdminController@viewIdea");
@@ -60,7 +65,9 @@ $router->get("/salarie/ideas", "SalarieController@myIdeas");
 $router->get("/salarie/ideas/submit", "SalarieController@submitIdea");
 $router->post("/salarie/ideas/store", "SalarieController@storeIdea");
 $router->get("/salarie/ideas/view/{id}", "SalarieController@viewIdea");
-
+$router->get("/salarie/ideas/edit/{id}", "SalarieController@editIdea");
+$router->post("/salarie/ideas/update/{id}", "SalarieController@updateIdea");
+$router->post("/salarie/ideas/delete/{id}", "SalarieController@deleteIdea");
 
 // ✅ Evaluateur routes
 $router->get("/evaluateur/ideas", "EvaluateurController@ideasToEvaluate");
@@ -68,6 +75,9 @@ $router->get("/evaluateur/ideas/evaluate/{id}", "EvaluateurController@evaluateId
 $router->post("/evaluateur/ideas/store_evaluation/{id}", "EvaluateurController@storeEvaluation");
 $router->get("/evaluateur/ideas/top", "EvaluateurController@topIdeas");
 $router->get("/evaluateur/evaluations", "EvaluateurController@myEvaluations");
+
+// ✅ PDF routes
+$router->get("/pdf/ideaPdf/{id}", "PdfController@ideaPdf");
 
 // ✅ Dispatch
 $router->dispatch();
