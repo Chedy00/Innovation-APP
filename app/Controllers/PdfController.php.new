@@ -1,0 +1,181 @@
+<?php
+// PdfController.php
+require_once __DIR__ . '/../Models/IdeaModel.php';
+require_once __DIR__ . '/../../vendor/fpdf/fpdf.php';
+
+class PdfController {
+    public function ideaPdf($id) {
+        $lang = $_GET['lang'] ?? 'fr';
+        $ideaModel = new IdeaModel();
+        $idea = $ideaModel->getIdeaWithEvaluations($id);
+        if (!$idea) {
+            die('Idée introuvable');
+        }
+        // Prepare translation if needed
+        if ($lang === 'en') {
+            $idea = $this->translateIdea($idea);
+        }
+        $pdf = new FPDF();
+        $pdf->AddPage();
+
+        // Header background (dark blue)
+        $pdf->SetFillColor(10,30,80);
+        $pdf->Rect(0,0,210,45,'F');
+
+        // Logo
+        $logoPath = __DIR__ . '/../../public/assets/img/pngegg.png';
+        if (file_exists($logoPath)) {
+            $pdf->Image($logoPath,10,8,24);
+        }
+
+        // Header with app name
+        $pdf->SetFont('Arial','B',20);
+        $pdf->SetTextColor(255,255,255);
+        $pdf->SetXY(0,10);
+        $pdf->Cell(0,10,utf8_decode($lang==='en' ? 'Innovation Hub - Idea Details' : "Innovation Hub - Détail de l'idée"),0,1,'C');
+
+        // Contact info with better spacing
+        $pdf->SetFont('Arial','',12);
+        $pdf->SetXY(0,22);
+        $pdf->Cell(0,8,utf8_decode($lang==='en' ? 'Location: Tunisia, Tunis Esprit' : 'Localisation: Tunisie, Tunis Esprit'),0,1,'C');
+        $pdf->SetXY(0,30);
+        $pdf->Cell(0,8,utf8_decode($lang==='en' ? 'Phone: +216 25 836 708' : 'Téléphone: 00216 25 836 708'),0,1,'C');
+        $pdf->SetXY(0,38);
+        $pdf->Cell(0,8,utf8_decode('admin@innovation.tn'),0,1,'C');
+        $pdf->Ln(10);
+
+        // Status Stamp (if approved or rejected)
+        if ($idea['statut'] === 'approuvee' || $idea['statut'] === 'rejetee') {
+            // Save current position
+            $currentX = $pdf->GetX();
+            $currentY = $pdf->GetY();
+
+            // Position the stamp at bottom right
+            $pdf->SetXY(120, $pdf->GetPageHeight() - 50);
+            
+            // Create stamp-like effect
+            $pdf->SetAlpha(0.8); // Semi-transparent
+            
+            // Set color based on status
+            if ($idea['statut'] === 'approuvee') {
+                $pdf->SetFillColor(0, 150, 0); // Green for approved
+                $stampText = $lang === 'en' ? 'APPROVED' : 'APPROUVÉE';
+            } else {
+                $pdf->SetFillColor(150, 0, 0); // Red for rejected
+                $stampText = $lang === 'en' ? 'REJECTED' : 'REJETÉE';
+            }
+            
+            // Draw rotated stamp
+            $pdf->StartTransform();
+            $pdf->Rotate(15, 120, $pdf->GetPageHeight() - 50);
+            $pdf->SetFont('Arial', 'B', 36);
+            $pdf->SetTextColor(255, 255, 255);
+            $pdf->Cell(70, 20, $stampText, 1, 0, 'C', true);
+            $pdf->StopTransform();
+            
+            // Reset transparency and position
+            $pdf->SetAlpha(1);
+            $pdf->SetXY($currentX, $currentY);
+        }
+
+        // Table 1: Idea Information
+        $pdf->SetFont('Arial','B',14);
+        $pdf->SetTextColor(10,30,80);
+        $pdf->Cell(0,10,utf8_decode($lang==='en' ? 'Idea Information' : "Informations sur l'idée"),0,1,'L');
+        $pdf->SetDrawColor(10,30,80);
+        $pdf->SetLineWidth(0.7);
+
+        $pdf->SetFont('Arial','',12);
+        $pdf->SetTextColor(0,0,0);
+        $pdf->SetFillColor(240,245,255);
+        
+        // Calculate average rating if needed
+        if (!isset($idea['moyenne_note']) || $idea['moyenne_note'] === null) {
+            $sum = 0;
+            $count = 0;
+            if (!empty($idea['evaluations'])) {
+                foreach ($idea['evaluations'] as $eval) {
+                    if (isset($eval['note']) && is_numeric($eval['note'])) {
+                        $sum += (float)$eval['note'];
+                        $count++;
+                    }
+                }
+                $idea['moyenne_note'] = $count > 0 ? $sum / $count : null;
+            }
+        }
+
+        $pdf->Cell(60,10,utf8_decode($lang==='en' ? 'Title' : 'Titre'),1,0,'L',true);
+        $pdf->Cell(0,10,utf8_decode($idea['titre']),1,1);
+        $pdf->Cell(60,10,utf8_decode($lang==='en' ? 'Description' : 'Description'),1,0,'L',true);
+        $pdf->MultiCell(0,10,utf8_decode($idea['description']),1);
+        $pdf->Cell(60,10,utf8_decode($lang==='en' ? 'Employee' : 'Salarié'),1,0,'L',true);
+        $pdf->Cell(0,10,utf8_decode($idea['salarie_nom'] . ' ' . $idea['salarie_prenom']),1,1);
+        $pdf->Cell(60,10,utf8_decode($lang==='en' ? 'Thematic' : 'Thématique'),1,0,'L',true);
+        $pdf->Cell(0,10,utf8_decode($idea['thematique_nom']),1,1);
+        $pdf->Cell(60,10,utf8_decode($lang==='en' ? 'Submission Date' : 'Date de soumission'),1,0,'L',true);
+        $pdf->Cell(0,10,utf8_decode($idea['date_soumission']),1,1);
+        $pdf->Cell(60,10,utf8_decode($lang==='en' ? 'Average Rating' : 'Note moyenne'),1,0,'L',true);
+        $pdf->Cell(0,10,utf8_decode($idea['moyenne_note'] !== null ? number_format((float)$idea['moyenne_note'], 2) : 'N/A'),1,1);
+        $pdf->Ln(8);
+
+        // Table 2: Evaluations
+        $pdf->SetFont('Arial','B',14);
+        $pdf->SetTextColor(10,30,80);
+        $pdf->Cell(0,10,utf8_decode($lang==='en' ? 'Evaluations' : 'Évaluations'),0,1,'L');
+        $pdf->SetDrawColor(10,30,80);
+        $pdf->SetLineWidth(0.7);
+
+        $pdf->SetFont('Arial','',12);
+        $pdf->SetTextColor(0,0,0);
+        if (!empty($idea['evaluations'])) {
+            $pdf->SetFont('Arial','B',12);
+            $pdf->SetFillColor(240,245,255);
+            $pdf->Cell(50,8,utf8_decode($lang==='en' ? 'Evaluator' : 'Évaluateur'),1,0,'L',true);
+            $pdf->Cell(20,8,utf8_decode($lang==='en' ? 'Rating' : 'Note'),1,0,'C',true);
+            $pdf->Cell(80,8,utf8_decode($lang==='en' ? 'Comment' : 'Commentaire'),1,0,'L',true);
+            $pdf->Cell(40,8,utf8_decode($lang==='en' ? 'Date' : 'Date'),1,1,'C',true);
+            
+            $pdf->SetFont('Arial','',12);
+            foreach ($idea['evaluations'] as $eval) {
+                $pdf->Cell(50,8,utf8_decode($eval['evaluateur_nom'] . ' ' . $eval['evaluateur_prenom']),1,0);
+                $pdf->Cell(20,8,utf8_decode($eval['note']),1,0,'C');
+                $pdf->Cell(80,8,utf8_decode($eval['commentaire']),1,0);
+                $pdf->Cell(40,8,utf8_decode($eval['date_evaluation']),1,1,'C');
+            }
+        } else {
+            $pdf->Cell(0,8,utf8_decode($lang==='en' ? 'No evaluation for this idea.' : 'Aucune évaluation pour cette idée.'),1,1);
+        }
+        $pdf->Ln(10);
+
+        // Footer
+        $pdf->SetY(-25);
+        $pdf->SetFont('Arial','I',10);
+        $pdf->SetTextColor(120,120,120);
+        $pdf->Cell(0,8,utf8_decode(($lang==='en' ? 'Document generated automatically on ' : 'Document généré automatiquement le ') . date('d/m/Y H:i')),0,1,'R');
+        $pdf->Output('I', 'idee_' . $id . '.pdf');
+        exit;
+    }
+
+    private function translateIdea($idea) {
+        $apiKey = 'YOUR_GOOGLE_API_KEY';
+        $endpoint = 'https://translation.googleapis.com/language/translate/v2';
+        $fields = ['titre', 'description', 'salarie_nom', 'salarie_prenom', 'thematique_nom'];
+        
+        foreach ($fields as $field) {
+            $idea[$field] = $this->googleTranslate($idea[$field], 'fr', 'en', $apiKey, $endpoint);
+        }
+        
+        if (!empty($idea['evaluations'])) {
+            foreach ($idea['evaluations'] as &$eval) {
+                $eval['commentaire'] = $this->googleTranslate($eval['commentaire'], 'fr', 'en', $apiKey, $endpoint);
+            }
+        }
+        return $idea;
+    }
+
+    private function googleTranslate($text, $source, $target, $apiKey, $endpoint) {
+        // This is a placeholder. You must implement the actual API call with curl or file_get_contents.
+        // See: https://cloud.google.com/translate/docs/reference/rest/v2/translate
+        return $text;
+    }
+}
